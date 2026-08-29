@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 Tim Orling
+# Copyright (C) 2026 Konsulko Group
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """Self-check for the parts of kcve that can silently produce a wrong answer:
 version parsing and the outstanding-backport inference. Run: ./test_kcve.py"""
 

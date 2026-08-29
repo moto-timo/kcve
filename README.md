@@ -127,6 +127,12 @@ vulns.git would leave the risk columns stale while the page looked fresh.
 The build output is **not** committed. It is ~8 MB (2.9 MB gzipped) and regenerates
 on every run; Pages serves it from the workflow artifact instead.
 
+## License
+
+GPL-2.0-or-later. See [LICENSE](LICENSE).
+
+Copyright (C) 2026 Tim Orling and Konsulko Group.
+
 ## Tests
 
 ```bash

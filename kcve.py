@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 Tim Orling
+# Copyright (C) 2026 Konsulko Group
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 """
 kcve - per-dot-release CVE ledger for Linux stable branches.
 
