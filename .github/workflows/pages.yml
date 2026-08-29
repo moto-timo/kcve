@@ -67,8 +67,8 @@ jobs:
     if: needs.check.outputs.build == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -77,10 +77,11 @@ jobs:
         run: ./kcve.py build --out _site/index.html
 
       # The gate reads this back from the live site on the next hourly run.
+      # Must not be a dotfile: upload-pages-artifact v4+ excludes hidden files.
       - name: Stamp the source revision
         run: git -C ~/.cache/kcve/vulns rev-parse HEAD > _site/vulns.sha
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
@@ -92,4 +93,4 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
