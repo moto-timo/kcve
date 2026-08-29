@@ -71,6 +71,15 @@
   .s0{background:var(--sev-none)} .s1{background:var(--sev-low)} .s2{background:var(--sev-med)}
   .s3{background:var(--sev-high)} .s4{background:var(--sev-crit)}
 
+  .legend {
+    display:flex; flex-wrap:wrap; gap:16px; align-items:center;
+    padding:11px 22px; font-size:11px; letter-spacing:0.05em;
+    text-transform:uppercase; color:var(--dim);
+    border-bottom:1px solid var(--rule);
+  }
+  .legend i { font-style:normal; display:flex; align-items:center; gap:6px; }
+  .legend .dot { margin-right:0; }
+
   .controls {
     display:flex; flex-wrap:wrap; gap:8px; align-items:center;
     padding:14px 22px; border-bottom:1px solid var(--rule);
@@ -143,6 +152,7 @@
 <div class="notice" id="notice" hidden></div>
 
 <section class="trains" id="trains"></section>
+<div class="legend" id="legend" hidden></div>
 
 <section>
   <div class="controls">
@@ -191,6 +201,8 @@ const el = (tag, cls, text) => {
 };
 
 const SEV = ["unscored", "low", "medium", "high", "critical"];
+// Tooltip text only; `bucket` above is the authority on where the edges fall.
+const SEV_RANGE = ["no CVSS published", "below 4.0", "4.0 to 6.9", "7.0 to 8.9", "9.0 and up"];
 const bucket = (score) =>
   score == null ? 0 : score >= 9 ? 4 : score >= 7 ? 3 : score >= 4 ? 2 : 1;
 
@@ -222,6 +234,7 @@ function boot() {
   for (const s of subs) $("#subsys").append(new Option(s, s));
 
   drawTrains();
+  drawLegend();
   wire();
   refresh();
 }
@@ -242,6 +255,23 @@ function emptyPage() {
     '<div class="empty">No data in this page yet. Build it with ' +
     '<code>./kcve.py build --branches 6.18,7.1</code>, ' +
     'or look at the interface first with <code>./kcve.py demo</code>.</div>';
+}
+
+function drawLegend() {
+  const host = $("#legend");
+  // Only what is actually on the page. Without --nvd the kernel CNA publishes
+  // high and critical only, so medium and low would be colours that never appear.
+  const present = new Set(rows.map((r) => r.sev));
+  // Highest severity first, to read the same way as a stack in the train above.
+  for (let i = SEV.length - 1; i >= 0; i--) {
+    if (!present.has(i)) continue;
+    const item = el("i", null);
+    item.title = SEV[i] + ": " + SEV_RANGE[i];
+    const swatch = el("span", "dot s" + i);
+    item.append(swatch, document.createTextNode(SEV[i]));
+    host.append(item);
+  }
+  host.hidden = false;
 }
 
 /* ---------- the release train: one cell per CVE, stacked into its release ---------- */
