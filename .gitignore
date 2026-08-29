@@ -1,0 +1,10 @@
+# Build output: 8 MB, regenerated on every run. Pages serves it from the
+# workflow artifact, so committing it would only bloat history.
+_site/
+kcve.html
+*.csv
+__pycache__/
+preview.html
+
+# Editor/tool-local config
+.claude/
