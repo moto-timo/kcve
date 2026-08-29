@@ -1,3 +1,7 @@
+# Copyright (C) 2026 Tim Orling
+# Copyright (C) 2026 Konsulko Group
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 name: pages
 
 on:
