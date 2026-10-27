@@ -276,6 +276,30 @@ function drawLegend() {
 
 /* ---------- the release train: one cell per CVE, stacked into its release ---------- */
 
+// A train pinned to its right end follows the latest release through resizes.
+// Scroll events land before the ResizeObserver in a frame, so a scroll caused by
+// a resize (a scrollbar appearing, the browser clamping on widen) is judged
+// against the smaller of the old and new scroll range, not taken as the reader
+// leaving the end.
+const maxScroll = (t) => t.scrollWidth - t.clientWidth;
+
+function pin(train) {
+  train.scrollLeft = train.scrollWidth;
+  train.dataset.end = maxScroll(train);
+}
+
+const pinRight = new ResizeObserver((entries) => {
+  for (const { target } of entries) {
+    if (target.dataset.pinned) pin(target);
+  }
+});
+
+function trackPin(train) {
+  const end = Math.min(+train.dataset.end, maxScroll(train)) - 1;
+  train.dataset.pinned = train.scrollLeft >= end ? "1" : "";
+  train.dataset.end = maxScroll(train);
+}
+
 function drawTrains() {
   const host = $("#trains");
   for (const branch of DATA.branches) {
@@ -332,6 +356,12 @@ function drawTrains() {
     }
     panel.append(train);
     host.append(panel);
+    // Releases run oldest to newest; start a train wider than the view on its latest,
+    // and keep it there through resizes until the reader scrolls away from the end.
+    pin(train);
+    train.dataset.pinned = "1";
+    train.addEventListener("scroll", () => trackPin(train), { passive: true });
+    pinRight.observe(train);
   }
 
   $("#trains").addEventListener("click", (e) => {
