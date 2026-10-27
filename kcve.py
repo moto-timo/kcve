@@ -470,7 +470,7 @@ def sample_records(branches: list[str]) -> list[dict]:
     subsystems = ["drivers/net", "drivers/gpu", "fs/btrfs", "net/ipv4", "mm",
                   "drivers/usb", "sound/soc", "fs/ext4", "kernel", "net/bluetooth"]
     plan = {b: [f"{b}.{z}" for z in range(1, n + 1)]
-            for b, n in zip(branches, (11, 2))}
+            for b, n in zip(branches, (40, 2))}
     records, serial = [], 40000
     for branch, releases in plan.items():
         for rel in releases:
