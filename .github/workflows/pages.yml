@@ -55,7 +55,7 @@ jobs:
 
           # Any failure here (first run, 404, DNS) leaves prev empty and we
           # build: never skip a deploy because a check was inconclusive.
-          remote=$(git ls-remote "$VULNS_GIT" HEAD | cut -f1)
+          remote=$(git ls-remote "$VULNS_GIT" HEAD | cut -f1 || true)
           prev=$(curl -sfL --max-time 30 "$site/vulns.sha" || true)
 
           if [ -n "$remote" ] && [ "$remote" = "$prev" ]; then
