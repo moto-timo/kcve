@@ -63,9 +63,12 @@
   .col .n { font-size:10px; color:var(--dim); margin-bottom:4px; }
   .col .stack { display:flex; flex-direction:column-reverse; gap:1px; align-items:stretch; }
   .col .tick { font-size:11px; color:var(--dim); padding-top:5px; border-top:1px solid var(--ink); margin-top:3px; }
-  .col[aria-pressed="true"] .tick { color:var(--ink); font-weight:600; }
+  .col[aria-pressed="true"] .tick { color:var(--ink); font-weight:600;
+                                    border-top:2px solid var(--sel); margin-top:2px; }
   .col[aria-pressed="true"] .n { color:var(--ink); font-weight:600; }
   .col:hover .n { color:var(--ink); }
+  /* the release being upgraded from: shown, but its own fixes are not in the range */
+  .col.base .tick { color:var(--ink); border-top-style:dashed; }
   .cell { display:block; height:4px; cursor:pointer; }
   .cell.on { outline:1.5px solid var(--sel); outline-offset:1px; position:relative; z-index:2; }
   .s0{background:var(--sev-none)} .s1{background:var(--sev-low)} .s2{background:var(--sev-med)}
@@ -79,6 +82,7 @@
   }
   .legend i { font-style:normal; display:flex; align-items:center; gap:6px; }
   .legend .dot { margin-right:0; }
+  .legend .hint { margin-left:auto; text-transform:none; letter-spacing:0; }
 
   .controls {
     display:flex; flex-wrap:wrap; gap:8px; align-items:center;
@@ -206,7 +210,10 @@ const SEV_RANGE = ["no CVSS published", "below 4.0", "4.0 to 6.9", "7.0 to 8.9",
 const bucket = (score) =>
   score == null ? 0 : score >= 9 ? 4 : score >= 7 ? 3 : score >= 4 ? 2 : 1;
 
-const state = { branch: null, release: null, sev: "", subsys: "", q: "", selected: null,
+// `release` alone selects one release. With `from` set, it is the top of a range:
+// everything fixed after `from` up to and including `release`, i.e. what an upgrade
+// from `from` to `release` picks up.
+const state = { branch: null, release: null, from: null, sev: "", subsys: "", q: "", selected: null,
                 unfixed: false, sort: "rel", dir: 1 };
 
 let rows = [];   // one row per (cve, branch) pairing that is in scope
@@ -236,7 +243,40 @@ function boot() {
   drawTrains();
   drawLegend();
   wire();
+  readHash();
+  window.addEventListener("hashchange", () => { readHash(); refresh(); revealSelection(); });
   refresh();
+  revealSelection();
+}
+
+// A shared link can name releases far left of where a train opens (its latest).
+function revealSelection() {
+  if (!state.release) return;
+  const col = document.querySelector(
+    `.col[data-branch="${state.branch}"][data-release="${state.release}"]`);
+  const train = col?.closest(".train");
+  if (!train) return;
+  train.dataset.pinned = "";
+  train.scrollLeft = col.offsetLeft - train.offsetLeft - train.clientWidth / 2;
+}
+
+/* ---------- shareable selection: #6.18.56 or #6.18.44..6.18.56 ---------- */
+
+function readHash() {
+  const [a, b] = decodeURIComponent(location.hash.slice(1)).split("..");
+  const to = b || a, from = b ? a : null;
+  const branch = DATA.branches.find((br) =>
+    DATA.byBranch[br].releases.some((r) => r.release === to));
+  const known = (r) => DATA.byBranch[branch].releases.some((x) => x.release === r);
+  if (!branch || (from && (!known(from) || relCmp(from, to) >= 0))) return;
+  Object.assign(state, { branch, release: to, from, unfixed: false });
+}
+
+function writeHash() {
+  const h = state.release ? (state.from ? state.from + ".." : "") + state.release : "";
+  if (h !== decodeURIComponent(location.hash.slice(1))) {
+    history.replaceState(null, "", h ? "#" + h : location.pathname + location.search);
+  }
 }
 
 function row(id, branch, release) {
@@ -249,6 +289,15 @@ function row(id, branch, release) {
 }
 
 const relKey = (r) => r.split(".").map(Number);
+const relCmp = (a, b) => {
+  const x = relKey(a), y = relKey(b);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
+  return 0;
+};
+const inSelection = (rel) =>
+  rel != null && (state.from
+    ? relCmp(rel, state.from) > 0 && relCmp(rel, state.release) <= 0
+    : rel === state.release);
 
 function emptyPage() {
   $("#trains").innerHTML =
@@ -271,6 +320,7 @@ function drawLegend() {
     item.append(swatch, document.createTextNode(SEV[i]));
     host.append(item);
   }
+  host.append(el("span", "hint", "shift-click a second release to see what an upgrade fixes"));
   host.hidden = false;
 }
 
@@ -369,15 +419,28 @@ function drawTrains() {
     if (unfixed) {
       const branch = unfixed.dataset.unfixed;
       const same = state.unfixed && state.branch === branch;
-      Object.assign(state, { unfixed: !same, branch: same ? null : branch, release: null });
+      Object.assign(state, { unfixed: !same, branch: same ? null : branch, release: null,
+                            from: null });
       return refresh();
     }
     const cell = e.target.closest(".cell");
     const col = e.target.closest(".col");
     if (!col) return;
-    const same = state.release === col.dataset.release && state.branch === col.dataset.branch;
-    state.branch = same && !cell ? null : col.dataset.branch;
-    state.release = same && !cell ? null : col.dataset.release;
+    const rel = col.dataset.release;
+    if (e.shiftKey && state.release && state.branch === col.dataset.branch) {
+      // Range from the first release clicked to this one, whichever way round.
+      const anchor = state.from || state.release;
+      if (rel === anchor) Object.assign(state, { release: rel, from: null });
+      else {
+        const [lo, hi] = relCmp(rel, anchor) < 0 ? [rel, anchor] : [anchor, rel];
+        Object.assign(state, { from: lo, release: hi });
+      }
+    } else {
+      const same = !state.from && state.release === rel && state.branch === col.dataset.branch;
+      state.branch = same && !cell ? null : col.dataset.branch;
+      state.release = same && !cell ? null : rel;
+      state.from = null;
+    }
     state.unfixed = false;
     if (cell) state.selected = cell.dataset.cve;
     refresh();
@@ -393,8 +456,8 @@ function wire() {
   $("#sev").addEventListener("change", (e) => { state.sev = e.target.value; refresh(); });
   $("#subsys").addEventListener("change", (e) => { state.subsys = e.target.value; refresh(); });
   $("#reset").addEventListener("click", () => {
-    Object.assign(state, { branch: null, release: null, sev: "", subsys: "", q: "",
-                          unfixed: false });
+    Object.assign(state, { branch: null, release: null, from: null, sev: "", subsys: "",
+                          q: "", unfixed: false });
     $("#q").value = ""; $("#sev").value = ""; $("#subsys").value = "";
     refresh();
   });
@@ -417,7 +480,7 @@ function wire() {
 function refresh() {
   visible = rows.filter((r) =>
     (!state.branch || r.branch === state.branch) &&
-    (!state.release || r.rel === state.release) &&
+    (!state.release || inSelection(r.rel)) &&
     (!state.unfixed || r.rel === null) &&
     (state.sev === "" || String(r.sev) === state.sev) &&
     (!state.subsys || r.subsys === state.subsys) &&
@@ -441,17 +504,29 @@ function refresh() {
   document.querySelectorAll("[data-unfixed]").forEach((b) =>
     b.setAttribute("aria-pressed",
       String(state.unfixed && b.dataset.unfixed === state.branch)));
-  document.querySelectorAll(".col").forEach((c) =>
-    c.setAttribute("aria-pressed",
-      String(c.dataset.release === state.release && c.dataset.branch === state.branch)));
+  document.querySelectorAll(".col").forEach((c) => {
+    const mine = c.dataset.branch === state.branch;
+    c.setAttribute("aria-pressed", String(mine && !!state.release && inSelection(c.dataset.release)));
+    c.classList.toggle("base", mine && c.dataset.release === state.from);
+  });
   document.querySelectorAll(".cell").forEach((c) =>
     c.classList.toggle("on", c.dataset.cve === state.selected));
 
+  const crit = visible.filter((r) => r.sev === 4).length;
+  const kev = visible.filter((r) => r.exploited).length;
   $("#chip").textContent =
     `${visible.length} of ${rows.length} match` +
     (state.unfixed ? ` · ${state.branch}.y no backport`
+      : state.from ? ` · ${state.from} → ${state.release}` +
+          (crit ? ` · ${crit} critical` : "") + (kev ? ` · ${kev} KEV` : "")
       : state.release ? ` · ${state.release}`
       : state.branch ? ` · ${state.branch}.y` : "");
+  $("#chip").title = state.from
+    ? `CVEs fixed after ${state.from}, up to and including ${state.release}. ` +
+      "Fixes only: flaws introduced between these releases are not recorded, and " +
+      "CVEs with no backport stay outstanding on both."
+    : "";
+  writeHash();
 
   drawRows();
   drawDetail();
@@ -553,7 +628,8 @@ function exportCsv() {
   const blob = new Blob([head.join(",") + "\n" + body.join("\n")], { type: "text/csv" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "kcve.csv";
+  a.download = state.from ? `kcve-${state.from}..${state.release}.csv`
+    : state.release ? `kcve-${state.release}.csv` : "kcve.csv";
   a.click();
   URL.revokeObjectURL(a.href);
 }
