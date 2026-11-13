@@ -68,6 +68,17 @@ stderr, so the output pipes cleanly:
 In the dashboard, the same list is behind the outstanding count in each branch
 header — click it to filter, then Export CSV.
 
+### What an upgrade fixes
+
+Click a release in a train, then shift-click another on the same train. The table
+shows every CVE fixed after the older release, up to and including the newer one:
+what moving from 6.18.44 to 6.18.56 picks up. The selection is in the URL
+(`kcve.html#6.18.44..6.18.56`), so a comparison can be linked from a ticket.
+
+This counts fixes only. The CNA records where a flaw was introduced per branch, not
+per release, so flaws introduced between the two releases do not show. CVEs with no
+backport stay outstanding on both releases.
+
 ## Where the data comes from
 
 | | vulns.git | EPSS | CISA KEV | NVD |
